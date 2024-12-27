@@ -45,13 +45,13 @@ export default withAuth(
       return NextResponse.rewrite(new URL("/unauthorized", req.url));
     }
 
-    if (!req.nextauth.token) {
-      return NextResponse.redirect(loginUrl);
-    }
+    return NextResponse.next();
   },
   {
     callbacks: {
-      authorized: ({ token }) => !!token,
+      async authorized({ token }) {
+        return !!token;
+      },
     },
   }
 );
