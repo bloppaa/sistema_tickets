@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { z } from "zod";
 import prisma from "@/lib/db";
 import { getTicketMetadata } from "@/lib/actions";
-import { emailQueue } from "@/services/queueService";
+import emailService from "@/services/emailService";
 
 export async function POST(request: Request) {
   const [session, ticketMetadata] = await Promise.all([
@@ -87,22 +87,18 @@ export async function POST(request: Request) {
       select: { status: true, type: true, priority: true, id: true },
     });
 
-    emailQueue.add({
-      type: "ticket-created",
-      to: client.email,
-      data: {
-        ticketId: ticket.id.toString(),
-        firstName: client.firstName,
-        title,
-        description,
-        status: { name: ticket.status.name, hexColor: ticket.status.hexColor },
-        type: { name: ticket.type.name, hexColor: ticket.type.hexColor },
-        priority: {
-          name: ticket.priority.name,
-          hexColor: ticket.priority.hexColor,
-        },
-        ticketLink: `${process.env.NEXT_PUBLIC_BASE_URL}/client/ticket/${ticket.id}`,
+    await emailService.sendTicketCreatedEmail(client.email, {
+      ticketId: ticket.id.toString(),
+      firstName: client.firstName,
+      title,
+      description,
+      status: { name: ticket.status.name, hexColor: ticket.status.hexColor },
+      type: { name: ticket.type.name, hexColor: ticket.type.hexColor },
+      priority: {
+        name: ticket.priority.name,
+        hexColor: ticket.priority.hexColor,
       },
+      ticketLink: `${process.env.NEXT_PUBLIC_BASE_URL}/client/ticket/${ticket.id}`,
     });
 
     return new Response(
