@@ -7,7 +7,6 @@ import "dotenv/config";
 import emailService from "@/services/emailService";
 import crypto from "crypto";
 import { Ticket } from "@prisma/client";
-import { emailQueue } from "@/services/queueService";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 
@@ -83,28 +82,24 @@ export async function assignUserToTicket(ticketId: string, userId: string) {
       }),
     ]);
 
-    emailQueue.add({
-      type: "ticket-assigned",
-      to: user.email,
-      data: {
-        ticketId: ticketId,
-        firstName: user.firstName,
-        title: ticket.title,
-        description: ticket.description,
-        status: {
-          name: ticket.status.name,
-          hexColor: ticket.status.hexColor,
-        },
-        priority: {
-          name: ticket.priority.name,
-          hexColor: ticket.priority.hexColor,
-        },
-        type: {
-          name: ticket.type.name,
-          hexColor: ticket.type.hexColor,
-        },
-        ticketLink: `${process.env.NEXT_PUBLIC_BASE_URL}/user/ticket/${ticketId}`,
+    await emailService.sendTicketAssignedEmail(user.email, {
+      ticketId: ticketId,
+      firstName: user.firstName,
+      title: ticket.title,
+      description: ticket.description,
+      status: {
+        name: ticket.status.name,
+        hexColor: ticket.status.hexColor,
       },
+      priority: {
+        name: ticket.priority.name,
+        hexColor: ticket.priority.hexColor,
+      },
+      type: {
+        name: ticket.type.name,
+        hexColor: ticket.type.hexColor,
+      },
+      ticketLink: `${process.env.NEXT_PUBLIC_BASE_URL}/user/ticket/${ticketId}`,
     });
 
     revalidatePath(`/admin/ticket/${ticketId}`);
@@ -143,23 +138,19 @@ export async function updateTicketStatus(ticketId: string, statusId: string) {
       },
     });
 
-    emailQueue.add({
-      type: "status-change",
-      to: ticket.client.email,
-      data: {
-        firstName: ticket.client.firstName,
-        ticketId: ticketId,
-        title: ticket.title,
-        prevStatus: {
-          name: ticket.status.name,
-          hexColor: ticket.status.hexColor,
-        },
-        newStatus: {
-          name: updatedTicket.status.name,
-          hexColor: updatedTicket.status.hexColor,
-        },
-        ticketLink: `${process.env.NEXT_PUBLIC_BASE_URL}/client/ticket/${ticketId}`,
+    emailService.sendStatusChangeEmail(ticket.client.email, {
+      firstName: ticket.client.firstName,
+      ticketId: ticketId,
+      title: ticket.title,
+      prevStatus: {
+        name: ticket.status.name,
+        hexColor: ticket.status.hexColor,
       },
+      newStatus: {
+        name: updatedTicket.status.name,
+        hexColor: updatedTicket.status.hexColor,
+      },
+      ticketLink: `${process.env.NEXT_PUBLIC_BASE_URL}/client/ticket/${ticketId}`,
     });
 
     revalidatePath(`/admin/ticket/${ticketId}`);
@@ -281,15 +272,6 @@ export async function createPerson(data: CreatePersonInput) {
       createLink: `${process.env.NEXT_PUBLIC_BASE_URL}/reset-password?token=${temporaryToken}&firstLogin=true`,
     });
 
-    // emailQueue.add({
-    //   type: "create-password",
-    //   to: data.email,
-    //   data: {
-    //     firstName: data.firstName,
-    //     createLink: `${process.env.NEXT_PUBLIC_BASE_URL}/reset-password?token=${temporaryToken}&firstLogin=true`,
-    //   },
-    // });
-
     revalidatePath("/admin/usuarios");
     revalidatePath("/admin/clientes");
     return user;
@@ -349,19 +331,15 @@ export async function createTicket(data: CreateTicketInput, isAdmin: boolean) {
     });
 
     if (isAdmin) {
-      emailQueue.add({
-        type: "ticket-created",
-        to: client.email,
-        data: {
-          ticketId: ticket.id.toString(),
-          firstName: client.firstName,
-          title: ticket.title,
-          description: ticket.description,
-          status: { name: status.name, hexColor: status.hexColor },
-          type: { name: type.name, hexColor: type.hexColor },
-          priority: { name: priority.name, hexColor: priority.hexColor },
-          ticketLink: `${process.env.NEXT_PUBLIC_BASE_URL}/client/ticket/${ticket.id}`,
-        },
+      await emailService.sendTicketCreatedEmail(client.email, {
+        ticketId: ticket.id.toString(),
+        firstName: client.firstName,
+        title: ticket.title,
+        description: ticket.description,
+        status: { name: status.name, hexColor: status.hexColor },
+        type: { name: type.name, hexColor: type.hexColor },
+        priority: { name: priority.name, hexColor: priority.hexColor },
+        ticketLink: `${process.env.NEXT_PUBLIC_BASE_URL}/client/ticket/${ticket.id}`,
       });
     }
 
@@ -514,14 +492,11 @@ export async function sendResetEmail(email: string) {
       data: { temporaryToken, tokenExpiry },
     });
 
-    emailQueue.add({
-      type: "reset-password",
-      to: email,
-      data: {
-        firstName: person.firstName,
-        resetLink: `${process.env.NEXT_PUBLIC_BASE_URL}/reset-password?token=${temporaryToken}`,
-      },
+    await emailService.sendResetPasswordEmail(email, {
+      firstName: person.firstName,
+      resetLink: `${process.env.NEXT_PUBLIC_BASE_URL}/reset-password?token=${temporaryToken}`,
     });
+
     return { success: true };
   } catch (error) {
     console.error("Failed to send reset email:", error);
