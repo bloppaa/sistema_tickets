@@ -276,14 +276,19 @@ export async function createPerson(data: CreatePersonInput) {
       },
     });
 
-    emailQueue.add({
-      type: "create-password",
-      to: data.email,
-      data: {
-        firstName: data.firstName,
-        createLink: `${process.env.NEXT_PUBLIC_BASE_URL}/reset-password?token=${temporaryToken}&firstLogin=true`,
-      },
+    await emailService.sendCreatePasswordEmail(data.email, {
+      firstName: data.firstName,
+      createLink: `${process.env.NEXT_PUBLIC_BASE_URL}/reset-password?token=${temporaryToken}&firstLogin=true`,
     });
+
+    // emailQueue.add({
+    //   type: "create-password",
+    //   to: data.email,
+    //   data: {
+    //     firstName: data.firstName,
+    //     createLink: `${process.env.NEXT_PUBLIC_BASE_URL}/reset-password?token=${temporaryToken}&firstLogin=true`,
+    //   },
+    // });
 
     revalidatePath("/admin/usuarios");
     revalidatePath("/admin/clientes");
